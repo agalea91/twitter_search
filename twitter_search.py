@@ -63,12 +63,12 @@ def tweet_search(api, query, max_tweets, max_id, since_id, geocode):
     return searched_tweets, max_id
 
 
-def get_tweet_id(api, date='', days_ago=8, query='a'):
+def get_tweet_id(api, date='', days_ago=9, query='a'):
     ''' Function that gets the ID of a tweet. This ID can then be
         used as a 'starting point' from which to search. The query is
         required and has been set to a commonly used word by default.
         The variable 'days_ago' has been initialized to the maximum
-        amount we are able to search back in time (8).'''
+        amount we are able to search back in time (9).'''
 
     if date:
         # return an ID from the start of the given day
