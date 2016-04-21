@@ -1,0 +1,250 @@
+<h2>Mining for tweets</h2>
+&nbsp;
+
+This post explains generally how my Python 3 <a href="https://github.com/agalea91/twitter_search/blob/master/twitter_search.py" target="_blank">tweet searching script</a> works. Twitter limits the maximum age of searchable tweets to roughly a week. As such, the script can search for tweets posted up to just over a week ago. Twitter also limits the maximum number of tweets downloaded in every 15 minute interval.
+
+The Python script <strong>twitter_search.py</strong> will search for tweets and save them to a JSON formatted file. When an exception is raised (i.e., the maximum number of tweets has been downloaded) the script will pause for 15 minutes and then continue. This will repeat continuously as tweets with a matching query are found.  The tweet creation dates are used to label the JSON output files. The search limits must be specified: a maximum number of days old (up to about 8) and a minimum age (as low as 0 i.e., "right now"). I prefer to collect tweets over only one day intervals such that each day is exported into its own file.
+
+&nbsp;
+<h3>Dependencies</h3>
+I used Python 3 for this project; if you do not have Python then I would recommend installing it via the <a href="https://www.continuum.io/downloads" target="_blank">Anaconda distribution</a>. Other dependencies are Tweepy 3.5.0 (a library for accessing the <a href="https://dev.twitter.com/overview/api" target="_blank">Twitter API</a>) and a personal <a href="https://apps.twitter.com/" target="_blank">Twitter "data-mining" application</a> (which is very easy to set up). I used <a href="http://marcobonzanini.com/2015/03/02/mining-twitter-data-with-python-part-1/#Register_Your_App" target="_blank">this guide</a> to register my app. You will need to register your own in order to generate a consumer key, consumer secret, access token, and access secret; these are required to authenticate the script in order to access the Twitter API.
+
+&nbsp;
+<h3>Running the script</h3>
+You can download my Python tweet searching/saving script using Git Shell:
+<blockquote>git clone https://github.com/agalea91/twitter_search</blockquote>
+or directly from its <a href="https://github.com/agalea91/twitter_search" target="_blank">git repository</a>.
+
+Open the <strong>twitter_search.py</strong> file and then find the <strong>load_api()</strong> function (at the top) and add your consumer key, consumer secret, access token, and access secret. For example:
+
+[code language="python"]
+consumer_key = '189YcjF4IUzF156RGNGNucDD8'
+consumer_secret = 'e4KPiY4pSh03HxjDg782HupUjmzdOOSDd98hd'
+access_token = '2543812-cpaIuwndjvbdjaDDp5izzndhsD7figa9gb'
+access_secret = '4hdyfnas7d988ddjf87sJdj3Dxn4d5CcNpwe'
+[/code]
+
+This is not my actual information as it should be kept private.
+
+Before running the script, go to the <strong>main()</strong> function and edit the search criteria. Namely, you should enter a search phrase, the maximum time limit for the script to run, and the date range for the search (relative to today). For example:
+
+[code language="python"]
+search_phrase = '#makedonalddrumpfagain'
+time_limit = 1.0 # runtime limit in hours
+min_days_old, max_days_old = 1, 2 # search limits
+
+# e.g. min_days_old, max_days_old = 7, 8
+# gives the current weekday from last week,
+# min_days_old=0 will search from right now
+[/code]
+
+I found that max_days_old=9 was the largest value possible.
+
+To run the script, open the terminal/command line to the file location and type:
+<blockquote>python twitter_search.py</blockquote>
+The script will search for tweets and save them to a JSON file until they have all been found or the time limit has exceeded.
+
+&nbsp;
+<h3>twitter_search.py functions</h3>
+The main program is contained within the <strong>main()</strong> function, which is called automatically when running the script from the command line.  This part of the code is not shown below. Instead we only discuss the other functions.  Before we get started I'll list the libraries used in the script:
+
+[code language="python"]
+import tweepy
+from tweepy import OAuthHandler
+import json
+import datetime as dt
+import time
+import os
+import sys
+[/code]
+
+&nbsp;
+
+Firstly, the function <strong>load_api()</strong> authenticates the user and returns the <a href="http://docs.tweepy.org/en/latest/api.html" target="_blank">Tweepy API wrapper</a>:
+
+[code language="python"]
+def load_api():
+    ''' Function that loads the twitter API after authorizing
+        the user. '''
+
+    consumer_key = '189YcjF4IUzF156RGNGNucDD8'
+    consumer_secret = 'e4KPiY4pSh03HxjDg782HupUjmzdOOSDd98hd'
+    access_token = '2543812-cpaIuwndjvbdjaDDp5izzndhsD7figa9gb'
+    access_secret = '4hdyfnas7d988ddjf87sJdj3Dxn4d5CcNpwe'
+    auth = OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_secret)
+    # load the twitter API via tweepy
+    return tweepy.API(auth)
+[/code]
+
+By running api=load_api() we can access <a href="https://dev.twitter.com/rest/reference/get/search/tweets" target="_blank">Twitter's search function</a>, e.g. api.search(q='#makedonalddrumpfagain').
+
+&nbsp;
+
+Twitter limits the maximum number of tweets returned per search to 100. We use a function [1] called <strong>tweet_search()</strong> that searches for up to max_tweets=100 tweets:
+
+[code language="python"]
+def tweet_search(api, query, max_tweets, max_id, since_id, geocode):
+    ''' Function that takes in a search string 'query', the maximum
+        number of tweets 'max_tweets', and the minimum (i.e., starting)
+        tweet id. It returns a list of tweepy.models.Status objects. '''
+
+    searched_tweets = []
+    while len(searched_tweets) &lt; max_tweets:
+        remaining_tweets = max_tweets - len(searched_tweets)
+        try:
+            new_tweets = api.search(q=query, count=remaining_tweets,
+                                    since_id=str(since_id),
+                                    max_id=str(max_id-1))
+#                                    geocode=geocode)
+            print('found',len(new_tweets),'tweets')
+            if not new_tweets:
+                print('no tweets found')
+                break
+            searched_tweets.extend(new_tweets)
+            max_id = new_tweets[-1].id
+            except tweepy.TweepError:
+            print('exception raised, waiting 15 minutes')
+            print('(until:', dt.datetime.now()+dt.timedelta(minutes=15), ')')
+            time.sleep(15*60)
+            break # stop the loop
+    return searched_tweets, max_id
+[/code]
+
+This function loops over an api.search() call because it's possible for less than 100 tweets to be returned and thus it is called until all 100 tweets are found. In the main program we loop over this function until the exception is raised, at which point our script sleeps for 15 minutes before continuing.
+
+The search can be limited to a specific radial area around longitude &amp; latitude coordinates by uncommenting the geocode line and defining the parameter appropriately. For example nearly all states in America are included in the geocode '39.8,-95.583068847656,2500km'. The issue here is a vast majority of the tweets are not geocoded and will therefore be excluded.
+
+&nbsp;
+
+The api.search() function can start from a given tweet ID or date and will always search back in time. If we are appending the tweet data to an already existing JSON file, the "starting" tweet ID is defined based on the last tweet appended to the file (this is done in the main program). Otherwise we run the function <strong>get_tweet_id()</strong> to find the ID of a tweet that was posted at the end of a given day and this is used as the starting point for the search.
+
+[code language="python"]
+def get_tweet_id(api, date='', days_ago=9, query='a'):
+    ''' Function that gets the ID of a tweet. This ID can
+        then be used as a 'starting point' from which to
+        search. The query is required and has been set to
+        a commonly used word by default. The variable
+        'days_ago' has been initialized to the maximum amount
+        we are able to search back in time (9).'''
+
+    if date: # return an ID from the start of the given day
+        td = date + dt.timedelta(days=1)
+        tweet_date = '{0}-{1:0&gt;2}-{2:0&gt;2}'.format(td.year, td.month, td.day)
+        tweet = api.search(q=query, count=1, until=tweet_date)
+    else:
+        # return an ID from __ days ago
+        td = dt.datetime.now() - dt.timedelta(days=days_ago)
+        tweet_date = '{0}-{1:0&gt;2}-{2:0&gt;2}'.format(td.year, td.month, td.day)
+        # get list of up to 10 tweets
+        tweet = api.search(q=query, count=10, until=tweet_date)
+        print('search limit (start/stop):',tweet[0].created_at)
+        # return the id of the first tweet in the list
+        return tweet[0].id
+[/code]
+
+&nbsp;
+
+After each call of tweet_search() in the main program, we append the new tweets to a file in JSON format:
+
+[code language="python"]
+def write_tweets(tweets, filename):
+    ''' Function that appends tweets to a file. '''
+
+    with open(filename, 'a') as f:
+        for tweet in tweets:
+            json.dump(tweet._json, f)
+            f.write('\n')
+[/code]
+
+&nbsp;
+
+The resulting JSON file can easily (although not necessarily quickly) be read and converted to a Pandas dataframe for analysis.
+
+&nbsp;
+<h3>Reading in JSON files to a dataframe</h3>
+The twitter_search.py file is only used for collecting tweets and I use ipyhton notebooks for analysis. First we'll need to read the JSON file(s):
+
+[code language="python"]
+import json
+
+tweet_files = ['file_1.json', 'file_2.json', ...]
+tweets = []
+for file in tweet_files:
+    with open(file, 'r') as f:
+        for line in f.readlines():
+            tweets.append(json.loads(line))
+[/code]
+
+&nbsp;
+
+We now have a dictionary named "tweets". This can be accessed to create a dataframe with the required information. We'll include the location information of the user who published the tweet as well as the coordinates (if available) and tweet text.
+
+[code language="python"]
+def populate_tweet_df(tweets):
+    df = pd.DataFrame()
+
+    df['text'] = list(map(lambda tweet: tweet['text'], tweets))
+
+    df['location'] = list(map(lambda tweet: tweet['user']['location'], tweets))
+
+    df['country_code'] = list(map(lambda tweet: tweet['place']['country_code']
+                                  if tweet['place'] != None else '', tweets))
+
+    df['long'] = list(map(lambda tweet: tweet['coordinates']['coordinates'][0]
+                        if tweet['coordinates'] != None else 'NaN', tweets))
+
+    df['latt'] = list(map(lambda tweet: tweet['coordinates']['coordinates'][1]
+                        if tweet['coordinates'] != None else 'NaN', tweets))
+
+    return df
+[/code]
+
+&nbsp;
+<h3>Data analysis: plotting tweet coordinates</h3>
+We can now, for example, plot the locations from which the tweets were sent using the Basemap library (which must by manually installed [2]).
+
+[code language="python"]
+from mpl_toolkits.basemap import Basemap
+
+# plot the blank world map
+my_map = Basemap(projection='merc', lat_0=50, lon_0=-100,
+                     resolution = 'l', area_thresh = 5000.0,
+                     llcrnrlon=-140, llcrnrlat=-55,
+                     urcrnrlon=160, urcrnrlat=70)
+# set resolution='h' for high quality
+
+# draw elements onto the world map
+my_map.drawcountries()
+#my_map.drawstates()
+my_map.drawcoastlines(antialiased=False,
+                      linewidth=0.005)
+
+# add coordinates as red dots
+longs = list(df.loc[(df.long != 'NaN')].long)
+latts = list(df.loc[df.latt != 'NaN'].latt)
+x, y = my_map(longs, latts)
+my_map.plot(x, y, 'ro', markersize=6, alpha=0.5)
+
+plt.show()
+[/code]
+
+&nbsp;
+
+In the next post we'll look at a politically inspired analysis of tweets posted with the hashtag #MakeDonaldDrumpfAgain. The phrase was trending a couple weeks ago in reaction to <a href="https://www.youtube.com/watch?v=DnpO_RTSNmQ&amp;feature=youtu.be&amp;t=1204" target="_blank">an episode of HBO's "Last Week Tonight" with John Oliver</a>. The phrase represents a negative sentiment towards Donald Trump - a Republican candidate for the upcoming American election. I've collected every #MakeDonaldDrumpfAgain tweet since the video was posted and was able to produce, using the plotting script above, this illustration of tweet locations:
+
+<img class="alignnone size-full wp-image-1433" src="https://galeascience.files.wordpress.com/2016/03/drumpf_tweet_locations_world1.png" alt="drumpf_tweet_locations_world" width="1457" height="903" />
+
+&nbsp;
+
+&nbsp;
+
+From the 550,000+ tweets I collected, only ~400 of them had longitude and latitude coordinates and these locations are all plotted above. As can be seen, most geocoded tweets about this topic have come from the eastern USA.
+
+Thanks for reading!  If you would like to discuss any of the plots or have any questions or corrections, please write a comment. You are also welcome to email me at agalea91@gmail.com or tweet me @agalea91
+
+&nbsp;
+
+[1] - My function is based on <a href="http://stackoverflow.com/questions/22469713/managing-tweepy-api-search/23996991#23996991" target="_blank">one I found on Stackoverflow</a>.
+
+[2] - I used <a href="http://stackoverflow.com/a/31713592/3511819" target="_blank">these instructions to install Basemap</a> on Windows 10 for Python 3.
