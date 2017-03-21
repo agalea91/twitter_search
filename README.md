@@ -1,4 +1,4 @@
-# `twitter_search.py` data-mining Python 3 script
+# `twitter_search.py`
 
 [My blog post](https://galeascience.wordpress.com/2016/03/18/collecting-twitter-data-with-python/) gives a thorough explanation of how to set up the code (including the dependancies), what it's doing, and an example how to use the resulting tweet data.  I've also included the basics below.
 
