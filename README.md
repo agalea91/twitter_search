@@ -10,7 +10,7 @@ A [user-contributed resource is available here](https://github.com/agalea91/twit
 
 To access the Twitter API I used Tweepy 3.5.0.  I also imported the libaraies: json, datetime, time, os and sys.
 
-In addition, you'll need a personal [Twitter "data-mining" application](https://apps.twitter.com/) (which is very easy to set up). I used [this guide] (http://marcobonzanini.com/2015/03/02/mining-twitter-data-with-python-part-1/#Register_Your_App) to register my app. You will need to register your own in order to generate a consumer key, consumer secret, access token, and access secret; these are required to authenticate the script in order to access the Twitter API.
+In addition, you'll need a personal [Twitter "data-mining" application](https://apps.twitter.com/) (which is very easy to set up). I used [this guide](http://marcobonzanini.com/2015/03/02/mining-twitter-data-with-python-part-1/#Register_Your_App) to register my app. You will need to register your own in order to generate a consumer key, consumer secret, access token, and access secret; these are required to authenticate the script in order to access the Twitter API.
 
 
 ### Running the script
