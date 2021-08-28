@@ -36,10 +36,17 @@ def load_api():
     return tweepy.API(auth)
 
     
-def tweet_search(api, query, max_tweets, max_id, since_id, geocode):
+def tweet_search(api, query, max_tweets, max_id, since_id, geocode,only_image_tweets):
     ''' Function that takes in a search string 'query', the maximum
         number of tweets 'max_tweets', and the minimum (i.e., starting)
-        tweet id. It returns a list of tweepy.models.Status objects. '''
+        tweet id. It returns a list of tweepy.models.Status objects.
+        only_image_tweets holds a boolean value and when true only returns tweets that contain images.(By default False)'''
+    
+    if only_image_tweets:
+                query += ("%20"+"filter%3Aimages")
+                # %20 and %3A are the URL encodes for space and : respectively and when this is concatenated
+                # with images finds tweets that contains images in them.
+                # For more on URL Encoding visit here https://alias.live/urlEncode
 
     searched_tweets = []
     while len(searched_tweets) < max_tweets:
@@ -180,7 +187,7 @@ def main():
             # collect tweets and update max_id
             tweets, max_id = tweet_search(api, search_phrase, max_tweets,
                                           max_id=max_id, since_id=since_id,
-                                          geocode=USA)
+                                          geocode=USA,only_image_tweets=False)
             # write tweets to file in JSON format
             if tweets:
                 write_tweets(tweets, json_file)
